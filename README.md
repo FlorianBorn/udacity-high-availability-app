@@ -80,5 +80,3 @@ The infrastructure is devided in 2 Stacks. The **network** Stack sets up the req
 `2.` Create the servers stack<br>
 ```create_stack.sh servers servers.yml servers-parameters.json```<br>
 
-
-To access instances which
