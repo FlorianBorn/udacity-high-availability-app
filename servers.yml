@@ -1,0 +1,325 @@
+Description: >
+    Florian Born / Udacity ND Project 2
+    Server Infrastructure
+
+Parameters:
+
+  EnvironmentName:
+    Description: Name der Umgebung / des Projekts
+    Type: String
+  S3Repo:
+    Description: the name and path of the udacity zip-file 
+    Type: String
+
+
+Resources:
+
+# LB Security Group
+    LBSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupDescription: "Allow HTTP an LoadBalancer"
+            SecurityGroupEgress: # Why Egress Port 80? See: https://superuser.com/questions/669689/does-a-web-server-use-a-different-port-transport-data
+              - IpProtocol: tcp
+                FromPort: 80
+                ToPort: 80
+                CidrIp: 0.0.0.0/0  
+            SecurityGroupIngress:
+              - IpProtocol: tcp
+                FromPort: 80
+                ToPort: 80
+                CidrIp: 0.0.0.0/0
+            VpcId: 
+              Fn::ImportValue: !Sub ${EnvironmentName}-Vpc
+
+
+# Listener & Listener Rule
+    Listener:
+        Type: AWS::ElasticLoadBalancingV2::Listener
+        Properties:
+            DefaultActions: 
+              - Type: forward
+                TargetGroupArn: !Ref LbTargetGroup
+            LoadBalancerArn: !Ref ApplicationLoadBalancer
+            Port: '80'
+            Protocol: HTTP
+
+    ListenerRule:
+        Type: AWS::ElasticLoadBalancingV2::ListenerRule
+        Properties:
+            Actions:
+              - Type: forward
+                TargetGroupArn: !Ref LbTargetGroup
+                Order:  1
+            Conditions:
+              - Field: path-pattern
+                Values:
+                  - /
+            ListenerArn: !Ref 'Listener'
+            Priority: 1
+
+
+# Load Balancer
+    ApplicationLoadBalancer:
+        Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+        Properties:
+            Type: application
+            SecurityGroups:
+              - !Ref LBSecurityGroup
+            Subnets: 
+              - Fn::ImportValue:
+                  !Sub ${EnvironmentName}-Pub-Subnet-1
+              - Fn::ImportValue:
+                  !Sub ${EnvironmentName}-Pub-Subnet-2
+            Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}
+
+# EC2 Security Group
+    Ec2SecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+          GroupDescription: "Allow Outbound Traffic, allow inbound http and ssh"
+          SecurityGroupEgress:
+            - CidrIp: 0.0.0.0/0
+              FromPort: 0
+              ToPort: 65535
+              IpProtocol: tcp
+          SecurityGroupIngress:
+            - CidrIp: 0.0.0.0/0
+              FromPort: 80
+              ToPort: 80
+              IpProtocol: tcp
+#            - CidrIp: 0.0.0.0/0
+            - CidrIp: 
+                  Fn::Join:
+                    - "/"
+                    - - Fn::GetAtt: BastionHost1.PrivateIp
+                      - Fn::ImportValue: 
+                           !Sub ${EnvironmentName}-Subnet-Bitmask
+              FromPort: 22
+              ToPort: 22
+              IpProtocol: tcp
+#            - CidrIp: 0.0.0.0/0
+            - CidrIp: 
+                  Fn::Join:
+                    - "/"
+                    - - Fn::GetAtt: BastionHost2.PrivateIp
+                      - Fn::ImportValue: 
+                           !Sub ${EnvironmentName}-Subnet-Bitmask
+              FromPort: 22
+              ToPort: 22
+              IpProtocol: tcp
+          VpcId: 
+              Fn::ImportValue: !Sub ${EnvironmentName}-Vpc
+
+# InstanceProfiles, Roles and Policies
+
+    ListBucketInstanceProfile:
+        Type: AWS::IAM::InstanceProfile
+        Properties:
+            Path: "/"
+            Roles:
+              - Ref: S3BucketRole
+
+    S3BucketRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Principal:
+                        Service:
+                          - ec2.amazonaws.com
+                    Action:
+                    - sts:AssumeRole
+            Path: "/"
+
+    S3BucketsPolicy:
+        Type: AWS::IAM::Policy
+        Properties:
+            PolicyName: S3BucketsPolicy
+            PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - s3:List*
+                      - s3:Get* # is needed to download files from bucket
+                    Resource: "*"
+            Roles:
+            - Ref: S3BucketRole   
+# Policy:
+#     Type: 'AWS::IAM::Policy'
+#     Properties:
+
+# IAM Profiles and Roles
+    # IamRole:
+    #     Type: 'AWS::IAM::Role'
+    #     Properties:
+    #         AssumeRolePolicyDocument:
+    #             Version: 2012-10-17
+    #             Statement:
+    #                - 
+
+    # ProfileWithRolesForOurApp:
+    #     Type: AWS::IAM::InstanceProfile
+    #     Properties: 
+    #         Roles:
+    #           - Fn:ImportValue: UdacityS3ReadOnlyEC2
+
+
+
+# Application LaunchConfiguration
+    AppLaunchConfiguration:
+      Type: AWS::AutoScaling::LaunchConfiguration
+      Properties:
+          AssociatePublicIpAddress: false
+          BlockDeviceMappings:
+            - DeviceName: /dev/sdf # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
+              Ebs: 
+                  VolumeSize: 10
+          ImageId: ami-06d51e91cea0dac8d # Ubuntu Server 18.04
+          InstanceMonitoring: false # to avoid additional costs
+          InstanceType: t2.micro # use free tier
+          IamInstanceProfile: !Ref ListBucketInstanceProfile
+          KeyName: foobar # to be able to connect via ssh
+          SecurityGroups:
+            - !Ref Ec2SecurityGroup
+          UserData:
+              Fn::Base64: !Sub |
+                  #!/bin/bash
+                  apt-get update -y
+                  apt-get install unzip awscli -y
+                  apt-get install apache2 -y
+                  systemctl start apache2.service
+                  cd /var/www/html
+                  aws s3 cp ${S3Repo} .
+                  unzip -o udacity.zip
+ 
+# Target Group
+    LbTargetGroup:
+        Type: AWS::ElasticLoadBalancingV2::TargetGroup
+        Properties:
+            HealthCheckEnabled: true
+            HealthCheckIntervalSeconds: 30
+            HealthCheckPath: /
+            #HealthCheckPort: 80
+            HealthCheckProtocol: HTTP
+            HealthCheckTimeoutSeconds: 10
+            HealthyThresholdCount: 2
+            UnhealthyThresholdCount: 2
+            Port: 80
+            Protocol: HTTP # protocol must be specified 
+            Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}
+            VpcId: 
+                Fn::ImportValue: !Sub ${EnvironmentName}-Vpc 
+
+
+# Auto Scaling Group
+    AutoScalingGroup:
+        Type: AWS::AutoScaling::AutoScalingGroup
+        Properties:
+            VPCZoneIdentifier:
+              - Fn::ImportValue:
+                    !Sub ${EnvironmentName}-Priv-Subnet-1
+              - Fn::ImportValue:
+                    !Sub ${EnvironmentName}-Priv-Subnet-2
+            # VPCZoneIdentifier:
+            #   - Fn::ImportValue:
+            #         !Sub ${EnvironmentName}-Pub-Subnet-1
+            #   - Fn::ImportValue:
+            #         !Sub ${EnvironmentName}-Pub-Subnet-2
+            DesiredCapacity: '1'
+            LaunchConfigurationName: !Ref AppLaunchConfiguration
+            MaxSize: '2'
+            MinSize: '1'
+            Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}
+                PropagateAtLaunch: true
+
+            TargetGroupARNs:
+              - !Ref LbTargetGroup
+
+    # Bastion Hosts and Security Groups
+    BastionHostSecurityGroup:
+          Type: AWS::EC2::SecurityGroup
+          Properties:
+              GroupDescription: "Allow only ssh"
+              SecurityGroupEgress:
+                - CidrIp: 0.0.0.0/0
+                  FromPort: 22
+                  ToPort: 22
+                  IpProtocol: tcp
+              SecurityGroupIngress:
+                - CidrIp: 0.0.0.0/0 # should static (known) IP if possible (corporate Network)
+                  FromPort: 22
+                  ToPort: 22
+                  IpProtocol: tcp
+              VpcId: 
+                  Fn::ImportValue: !Sub ${EnvironmentName}-Vpc
+
+    BastionHost1:
+        Type: AWS::EC2::Instance
+        Properties:
+            AvailabilityZone: 
+                !Select
+                    - 0
+                    - !GetAZs
+            ImageId: ami-06d51e91cea0dac8d # Ubuntu Server 18.04
+            InstanceType: t2.micro # use free tier
+            KeyName: foobar5
+            NetworkInterfaces:
+              - AssociatePublicIpAddress: true
+                DeviceIndex: '0'
+                SubnetId: 
+                    Fn::ImportValue:
+                        !Sub ${EnvironmentName}-Pub-Subnet-1
+                GroupSet: # IDs of the security groups for the network interface
+                  - !Ref BastionHostSecurityGroup                        
+#            SecurityGroupIds:
+#              - !Ref BastionHostSecurityGroup
+#            SubnetId:
+#                Fn::ImportValue:
+#                    !Sub ${EnvironmentName}-Pub-Subnet-1
+            Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}
+
+    BastionHost2:
+        Type: AWS::EC2::Instance
+        Properties:
+            AvailabilityZone: 
+                !Select
+                    - 1
+                    - !GetAZs
+            ImageId: ami-06d51e91cea0dac8d # Ubuntu Server 18.04
+            InstanceType: t2.micro # use free tier
+            KeyName: foobar5
+            NetworkInterfaces:
+              - AssociatePublicIpAddress: true
+                DeviceIndex: '0'
+                SubnetId: 
+                    Fn::ImportValue:
+                        !Sub ${EnvironmentName}-Pub-Subnet-2
+                GroupSet: # IDs of the security groups for the network interface
+                  - !Ref BastionHostSecurityGroup
+            #SecurityGroupIds:
+            #  - !Ref BastionHostSecurityGroup
+#            SubnetId:
+#                Fn::ImportValue:
+#                    !Sub ${EnvironmentName}-Pub-Subnet-2
+            Tags:
+              - Key: Name
+                Value: !Sub ${EnvironmentName}
+
+Outputs:
+    ApplicationLoadBalancerDnsName:
+        Description: The DNS Name of the application load Balancer
+        Value: 
+            Fn::Join: [ "", [ "http://", !GetAtt ApplicationLoadBalancer.DNSName ] ]
+        Export:
+            Name: !Sub ${EnvironmentName}-Lb-Dns-Name

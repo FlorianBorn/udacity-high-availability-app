@@ -1,0 +1,30 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "NDProject2"
+  },
+  {
+    "ParameterKey": "VpcCidr",
+    "ParameterValue": "10.0.0.0/16"
+  },
+  {
+    "ParameterKey": "SubnetBitmask",
+    "ParameterValue": "24"
+  },
+  {
+    "ParameterKey": "PrivateSubnet1Ip",
+    "ParameterValue": "10.0.20.0" 
+  },
+  {
+    "ParameterKey": "PrivateSubnet2Ip",
+    "ParameterValue": "10.0.21.0"
+  },
+  {
+    "ParameterKey": "PublicSubnet1Ip",
+    "ParameterValue": "10.0.10.0"
+  },
+  {
+    "ParameterKey": "PublicSubnet2Ip",
+    "ParameterValue": "10.0.11.0"
+  }
+]
