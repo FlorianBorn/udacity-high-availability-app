@@ -79,4 +79,6 @@ The infrastructure is devided in 2 Stacks. The **network** Stack sets up the req
 ```create_stack.sh network network.yml network-parameters.json```<br>
 `2.` Create the servers stack<br>
 ```create_stack.sh servers servers.yml servers-parameters.json```<br>
+or (in order to create IAM profiles)<br>
+```aws cloudformation update-stack --stack-name servers --template-body file://servers.yml --parameters file://servers-parameters.json --capabilities CAPABILITY_IAM```
 
