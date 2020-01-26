@@ -149,26 +149,6 @@ Resources:
                     Resource: "*"
             Roles:
             - Ref: S3BucketRole   
-# Policy:
-#     Type: 'AWS::IAM::Policy'
-#     Properties:
-
-# IAM Profiles and Roles
-    # IamRole:
-    #     Type: 'AWS::IAM::Role'
-    #     Properties:
-    #         AssumeRolePolicyDocument:
-    #             Version: 2012-10-17
-    #             Statement:
-    #                - 
-
-    # ProfileWithRolesForOurApp:
-    #     Type: AWS::IAM::InstanceProfile
-    #     Properties: 
-    #         Roles:
-    #           - Fn:ImportValue: UdacityS3ReadOnlyEC2
-
-
 
 # Application LaunchConfiguration
     AppLaunchConfiguration:
@@ -183,7 +163,7 @@ Resources:
           InstanceMonitoring: false # to avoid additional costs
           InstanceType: t2.micro # use free tier
           IamInstanceProfile: !Ref ListBucketInstanceProfile
-          KeyName: foobar # to be able to connect via ssh
+#          KeyName: foobar # to be able to connect via ssh
           SecurityGroups:
             - !Ref Ec2SecurityGroup
           UserData:
@@ -204,7 +184,7 @@ Resources:
             HealthCheckEnabled: true
             HealthCheckIntervalSeconds: 30
             HealthCheckPath: /
-            #HealthCheckPort: 80
+            HealthCheckPort: 80
             HealthCheckProtocol: HTTP
             HealthCheckTimeoutSeconds: 10
             HealthyThresholdCount: 2
@@ -271,7 +251,7 @@ Resources:
                     - !GetAZs
             ImageId: ami-06d51e91cea0dac8d # Ubuntu Server 18.04
             InstanceType: t2.micro # use free tier
-            KeyName: foobar5
+#            KeyName: foobar5
             NetworkInterfaces:
               - AssociatePublicIpAddress: true
                 DeviceIndex: '0'
@@ -298,7 +278,7 @@ Resources:
                     - !GetAZs
             ImageId: ami-06d51e91cea0dac8d # Ubuntu Server 18.04
             InstanceType: t2.micro # use free tier
-            KeyName: foobar5
+#            KeyName: foobar5
             NetworkInterfaces:
               - AssociatePublicIpAddress: true
                 DeviceIndex: '0'
