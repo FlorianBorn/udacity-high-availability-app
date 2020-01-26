@@ -17,7 +17,7 @@ To-Do's:
 # Infrastructure Diagram
 ![alt text][architecture]
 
-[architecture]: https://github.com/FlorianBorn/udacity-high-availability-app/infrastructure-diagram.png "Architecture Diagram"
+[architecture]: infrastructure-diagram.png "Architecture Diagram"
 
 # Prerequisitions
 
