@@ -161,7 +161,7 @@ Resources:
                   VolumeSize: 10
           ImageId: ami-06d51e91cea0dac8d # Ubuntu Server 18.04
           InstanceMonitoring: false # to avoid additional costs
-          InstanceType: t2.micro # use free tier
+          InstanceType: t3.small # t2.micro for free tier
           IamInstanceProfile: !Ref ListBucketInstanceProfile
 #          KeyName: foobar # to be able to connect via ssh
           SecurityGroups:
